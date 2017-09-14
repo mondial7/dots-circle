@@ -1,0 +1,379 @@
+<link rel="import" href="../polymer/polymer-element.html">
+
+<dom-module id="dots-circle">
+  <template>
+
+    <style>
+
+      :host {
+
+        display: block;
+        width: 100%;
+        height: 100%;
+        margin: auto;
+        text-align: center;
+
+      }
+
+      .wrapper {
+
+        background: transparent;
+
+      }
+
+    </style>
+
+    <canvas id="canvas" class="wrapper"></canvas>
+
+  </template>
+
+  <script>
+
+    /**
+     * `dots-circle`
+     * Dots and complexity effects as background
+     *
+     * @customElement
+     * @polymer
+     * @demo demo/index.html
+     */
+    class DotsCircle extends Polymer.Element {
+
+      static get is() { return 'dots-circle'; }
+      static get properties() {
+        return {
+
+          /**
+           * Number of dots to show
+           * default: 50
+           */
+          total: {
+            type: Number,
+            value: 10
+          },
+
+          /**
+           * Animation speed
+           * Timeout in milliseconds
+           * between dots print out
+           */
+          speed: {
+           type: Number,
+           value: 100
+          },
+
+          /**
+           * Attribute to monitor
+           * whether the element
+           * has been freezed (not active)
+           */
+          active: {
+            type: Boolean,
+            value: false,
+            reflectToAttribute: true
+          },
+
+          /**
+           * Color of the font
+           * can be changed on the fly
+           */
+          color: {
+            type: String,
+            value: 'black',
+            observer: '_updateColor'
+          },
+
+          /**
+           * Applied a width and height
+           * to the canvas
+           */
+          width: {
+            type: Number,
+            value: 400
+          },
+          height: {
+            type: Number,
+            value: 400
+          },
+
+          /**
+           * Symbol / Char printed out
+           * Currently the font family
+           * is predefined as sans-serif
+           */
+          char: {
+            type: String,
+            value: '.'
+          },
+
+          /**
+           * Used to check the initialization
+           * of the element and prevent bad
+           * behavior of the observers functions
+           */
+          _isready: {
+            type: Boolean,
+            value: false
+          },
+
+          /**
+           * Array that contains coordinates
+           * of each printed dot
+           */
+          dots: {
+            type: Array,
+            value: []
+          },
+
+          /**
+           * Lock used in the animation recursion
+           */
+          lock: {
+            type: Boolean,
+            value: false
+          },
+
+          /**
+           * Infinite animation
+           */
+          infinite: {
+            type: Boolean,
+            value: true,
+            reflectToAttribute: true
+          },
+
+          /**
+           * Nicely taken from emoji-rain @notwaldorf
+           */
+          _boundAnimate: {
+            type: Function,
+            value: function() {
+              return this._animate.bind(this);
+            }
+          }
+
+        };
+      }
+
+      connectedCallback() {
+        super.connectedCallback();
+
+        // get canvas and init context
+        this.canvas = this.$.canvas;
+        this.context = this.canvas.getContext('2d');
+
+        // set default font and color
+        this.context.font = "50px san-serif";
+        this.context.fillStyle = this.color;
+        this._color = this.color;
+
+        // free the lock for the initialization
+        // used to prevent observers calls exceptions
+        this._isready = true;
+
+        this.active = true;
+        this._animate();
+
+      }
+
+      /**
+       * End animation and clean up the canvas
+       */
+      end () {
+
+        this.freeze();
+        this._clearCanvas();
+        this.dots = [];
+
+      }
+
+      /**
+       * Begin the animation
+       */
+      begin () {
+
+        this.lock = false;
+        this.active = true;
+
+        this._animate();
+
+      }
+
+      /**
+       * Stop animations
+       */
+      freeze () {
+
+        clearTimeout(this.animation);
+        window.cancelAnimationFrame(this.animationFrame);
+        this.active = false;
+        this.lock = true;
+
+      }
+
+      /**
+       * Perform animation
+       */
+      _animate () {
+
+        let speed = this.speed;
+
+        if (this.dots.length >= this.total) {
+
+          // move dots
+
+          speed = 18;
+          this._moveDotsAround();
+
+        } else {
+
+          // add new dot
+
+          let x = Math.floor(Math.random() * this.canvas.width - 2);
+          let y = Math.floor(Math.random() * this.canvas.height - 2);
+
+          this.dots.push([x,y]);
+
+          this._printDot(x, y);
+
+        }
+
+        // continue the animation
+        if (!this.lock) {
+
+          let self = this;
+
+          this.animation = setTimeout(() => {
+            this.animationFrame = window.requestAnimationFrame(this._boundAnimate);
+          }, speed);
+
+        }
+
+      }
+
+      /**
+       * Animate the canvas moving all the dots around
+       */
+      _moveDotsAround () {
+
+        // update dots position
+        const l = this.dots.length;
+        let i = 0, dot;
+
+        // empty canvas
+        this._clearCanvas();
+
+        // update dots y-axis position
+        for (; i < l; i++) {
+
+          dot = this._getNewPosition(this.dots[i]);
+
+          this.dots[i] = [dot.x, dot.y];
+
+        }
+
+        // repaint the updated dots
+        this._repaintAllDots();
+
+      }
+
+      /**
+       * Calculate possible new dot position
+       * @param array [x, y]
+       * @return object { x: x, y: y }
+       */
+      _getNewPosition (dot) {
+
+        return {
+
+          x : this._getCoor(dot[0], this.canvas.width - 10),
+          y : this._getCoor(dot[1], this.canvas.height - 10)
+
+        }
+
+      }
+
+      /**
+       * Get valid new random coor
+       * @param integer original coordinate
+       * @param integer positive limit
+       * @return integer new coordinate
+       */
+      _getCoor (original, limit) {
+
+        let r, r2, span, c = -1;
+
+        // random number [-3, 3]
+        while (c < 0 || c > limit) {
+
+          span = Math.floor(Math.random() * 3) * (Math.random() > 0.5 ? 1 : -1);
+          c = original + span;
+
+        }
+
+        return c;
+
+      }
+
+      /**
+       * Repaint all existing dots
+       * usually called after updating the color
+       */
+      _repaintAllDots () {
+
+        let i = 0;
+        const l = this.dots.length;
+
+        for (; i < l; i++) {
+
+          this._printDot(this.dots[i][0], this.dots[i][1]);
+
+        }
+
+      }
+
+      /**
+       * Draw a dot on the canvas
+       * given the coordinates
+       */
+      _printDot (x, y) {
+
+        this.context.fillText(this.char, x, y);
+
+      }
+
+      /**
+       * Clear the canvas
+       */
+      _clearCanvas () {
+
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+      }
+
+      /**
+       * Observer
+       * Update new dots color
+       * and override existing ones with new color
+       */
+      _updateColor (color) {
+
+        if (!this._isready) {
+
+          return;
+
+        }
+
+        this.freeze();
+        this._color = color;
+        this.context.fillStyle = color;
+        this._repaintAllDots();
+        this.begin();
+
+      }
+
+    }
+
+    window.customElements.define(DotsCircle.is, DotsCircle);
+  </script>
+</dom-module>

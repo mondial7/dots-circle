@@ -16,7 +16,7 @@ Example:
     <link rel="import" href="dots-circle.html">
     <div style="height: 300px">
       <next-code-block></next-code-block>
-    </div
+    </div>
   </template>
 </custom-element-demo>
 ```
